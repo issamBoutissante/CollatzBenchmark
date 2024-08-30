@@ -1,35 +1,37 @@
 ﻿using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Running;
+using System;
+using System.Collections.Generic;
+using System.Linq;
 
 public class CollatzBenchmark
 {
-    private static readonly HashSet<CollatzItem> items = new();
+    private static readonly Dictionary<double, int> items = new();
 
     private static double CalculateEven(double evenNumber) => evenNumber / 2;
     private static double CalculateOdd(double oddNumber) => (3 * oddNumber) + 1;
 
     private static int GetNumberOfIterationsToReachOne(double number)
     {
-        int numberOfIterations = 1;
+        int numberOfIterations = 0;
+        double originalNumber = number;
 
-        // Create a new CollatzItem to search for it in the HashSet
-        var itemToSearch = new CollatzItem(number);
-
-        // Check if this number already exists, and if so, use its stored NumberOfIterations
-        if (items.TryGetValue(itemToSearch, out var existingItem))
+        while (number != 1)
         {
-            return numberOfIterations + existingItem.NumberOfIterations;
-        }
+            if (items.TryGetValue(number, out var cachedIterations))
+            {
+                numberOfIterations += cachedIterations;
+                break;
+            }
 
-        do
-        {
             if (number % 2 == 0)
                 number = CalculateEven(number);
             else
                 number = CalculateOdd(number);
             numberOfIterations++;
-        } while (number != 1);
+        }
 
+        items[originalNumber] = numberOfIterations;
         return numberOfIterations;
     }
 
@@ -38,32 +40,11 @@ public class CollatzBenchmark
     {
         for (var i = 1; i <= 1_000_000; i++)
         {
-            var collatzItem = new CollatzItem(i);
-            collatzItem.NumberOfIterations = GetNumberOfIterationsToReachOne(i);
-            items.Add(collatzItem);
+            GetNumberOfIterationsToReachOne(i);
         }
 
-        var maxPair = items.MaxBy(item => item.NumberOfIterations);
-        Console.WriteLine($"{maxPair?.StartNumber} - {maxPair?.NumberOfIterations}");
-    }
-}
-
-public class CollatzItem
-{
-    public double StartNumber { get; set; }
-    public int NumberOfIterations { get; set; }
-
-    public CollatzItem(double startNumber)
-    {
-        StartNumber = startNumber;
-    }
-
-    public override int GetHashCode() => StartNumber.GetHashCode();
-
-    public override bool Equals(object? obj)
-    {
-        if (obj is not CollatzItem other) return false;
-        return StartNumber == other.StartNumber;
+        var maxPair = items.OrderByDescending(item => item.Value).FirstOrDefault();
+        Console.WriteLine($"{maxPair.Key} - {maxPair.Value}");
     }
 }
 
@@ -72,6 +53,5 @@ class Program
     static void Main(string[] args)
     {
         var summary = BenchmarkRunner.Run<CollatzBenchmark>();
-        //new CollatzBenchmark().ComputeCollatzSequence();
     }
 }
